@@ -8,31 +8,43 @@ import logging
 from constants import BASE_DIR, MAIN_DOC_URL
 from configs import configure_argument_parser, configure_logging
 from outputs import control_output
+from utils import find_tag, get_response
 
 
 def whats_new(session):
     whats_new_url = urljoin(MAIN_DOC_URL, 'whatsnew/')
-    response = session.get(whats_new_url)
-    response.encoding = 'utf-8'
+
+    # response = session.get(whats_new_url)
+    # response.encoding = 'utf-8'
+    response = get_response(session, whats_new_url)
+    if response is None:
+        return
 
     soup = BeautifulSoup(response.text, features='lxml')
-
-    main_div = soup.find('section', attrs={'id': 'what-s-new-in-python'})
-    div_with_ul = main_div.find('div', attrs={'class': 'toctree-wrapper'})
+    # main_div = soup.find('section', attrs={'id': 'what-s-new-in-python'})
+    main_div = find_tag(soup, 'section', attrs={'id': 'what-s-new-in-python'})
+    # div_with_ul = main_div.find('div', attrs={'class': 'toctree-wrapper'})
+    div_with_ul = find_tag(main_div, 'div', attrs={'class': 'toctree-wrapper'})
     sections_by_python = div_with_ul.find_all(
         'li', attrs={'class': 'toctree-l1'}
     )
-
     results = [('Ссылка на статью', 'Заголовок', 'Редактор, автор')]
     for section in tqdm(sections_by_python):
         version_a_tag = section.find('a')
         href = version_a_tag['href']
         version_link = urljoin(whats_new_url, href)
-        response = session.get(version_link)
-        response.encoding = 'utf-8'
+
+        # response = session.get(version_link)
+        # response.encoding = 'utf-8'
+        response = get_response(session, version_link)
+        if response is None:
+            continue
+
         soup = BeautifulSoup(response.text, features='lxml')
-        h1 = soup.find('h1')
-        dl = soup.find('dl')
+        # h1 = soup.find('h1')
+        h1 = find_tag(soup, 'h1')
+        # dl = soup.find('dl')
+        dl = find_tag(soup, 'dl')
         dl_text = dl.text.replace('\n', ' ')
         results.append(
             (version_link, h1.text, dl_text)
@@ -41,11 +53,15 @@ def whats_new(session):
 
 
 def latest_versions(session):
-    response = session.get(MAIN_DOC_URL)
-    response.encoding = 'utf-8'
+    # response = session.get(MAIN_DOC_URL)
+    # response.encoding = 'utf-8'
+    response = get_response(session, MAIN_DOC_URL)
+    if response is None:
+        return
 
     soup = BeautifulSoup(response.text, features='lxml')
-    sidebar = soup.find('div', attrs={'class': 'sphinxsidebarwrapper'})
+    #  sidebar = soup.find('div', attrs={'class': 'sphinxsidebarwrapper'})
+    sidebar = find_tag(soup, 'div', attrs={'class': 'sphinxsidebarwrapper'})
     ul_tags = sidebar.find_all('ul')
     for ul in ul_tags:
         if 'All versions' in ul.text:
@@ -70,15 +86,21 @@ def latest_versions(session):
 
 def download(session):
     downloads_url = urljoin(MAIN_DOC_URL, 'download.html')
-    response = session.get(downloads_url)
-    response.encoding = 'utf-8'
+    # response = session.get(downloads_url)
+    # response.encoding = 'utf-8'
+    response = get_response(session, downloads_url)
+    if response is None:
+        return
 
     soup = BeautifulSoup(response.text, features='lxml')
-    ...
-
-    main_tag = soup.find('div', {'role': 'main'})
-    table_tag = main_tag.find('table', {'class': 'docutils'})
-    pdf_a4_tag = table_tag.find('a', {'href': re.compile(r'.+pdf-a4\.zip$')})
+    # main_tag = soup.find('div', {'role': 'main'})
+    main_tag = find_tag(soup, 'div', {'role': 'main'})
+    # table_tag = main_tag.find('table', {'class': 'docutils'})
+    table_tag = find_tag(main_tag, 'table', {'class': 'docutils'})
+    # pdf_a4_tag = table_tag.find('a', {'href': re.compile(r'.+pdf-a4\.zip$')})
+    pdf_a4_tag = find_tag(
+        table_tag, 'a', {'href': re.compile(r'.+pdf-a4\.zip$')}
+    )
     pdf_a4_link = pdf_a4_tag['href']
     archive_url = urljoin(downloads_url, pdf_a4_link)
     filename = archive_url.split('/')[-1]
@@ -89,7 +111,6 @@ def download(session):
     with open(archive_path, 'wb') as file:
         file.write(response.content)
     logging.info(f'Архив был загружен и сохранён: {archive_path}')
-
 
 
 MODE_TO_FUNCTION = {
